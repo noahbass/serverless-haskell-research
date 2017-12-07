@@ -1,0 +1,11 @@
+{
+  "name": "01-image-processing-example-node",
+  "version": "0.1.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "aws-sdk": "^2.165.0",
+    "dotenv": "^4.0.0",
+    "sharp": "^0.18.4"
+  }
+}
