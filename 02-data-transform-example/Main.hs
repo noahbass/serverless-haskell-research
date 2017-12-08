@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 -- Data Transform Example
 -- A Use Case:
 --     The ACM chapter at UC needs to find members that will be graduating in 2018,
@@ -15,7 +14,6 @@
 --     - Thinking about saftey in transforming the data
 --     - Returning transformed data in a compressed format
 
-import qualified Data.Vector as V
 import Control.Monad
 import Data.List.Split
 import Data.Maybe
@@ -25,22 +23,16 @@ import Data.Maybe
 
 main :: IO ()
 main = do
+    Prelude.putStrLn (show compute)
+
+
+compute :: Maybe [Member]
+compute = do
     let (csvHeader:csvBody) = csvToList (getCsvData "MyFakeConnectionConfig") -- getCsvData pretends to retrieve a csv data from a database
-    let members = linesToMembers csvBody
-    let filteredMembers = filterMembers members 2018
-    let membersWithEmails = expandEmailAddress filteredMembers
-    Prelude.putStrLn (show membersWithEmails)
-    -- let testLine = Prelude.head csvBody
-    -- let test = lineToMember testLine
-    -- Prelude.putStrLn (show test)
-    -- Prelude.putStrLn testLine
-    -- let (ts:nm:gy:st) = Data.List.Split.splitOn "," testLine
-    -- let member = Member {timestamp=(Just ts), name=(Just nm), graduationYear=(Just (read gy :: Int)), sixPlusTwo=(Just (Prelude.head st))}
-    -- Prelude.putStrLn (show member)
-    -- Prelude.putStrLn csvHeader
-    -- Prelude.putStrLn (show csvBody)
-
-
+    members <- linesToMembers csvBody
+    filteredMembers <- filteredMembers members 2018
+    membersWithEmails <- expandEmailAddress filteredMembers
+    return membersWithEmails
 
 -- A simple data structure to signify a 'member'
 -- Data for each member is wrapped in a Maybe monad
@@ -57,21 +49,24 @@ csvToList :: String -> [String]
 csvToList rawCsvData = Prelude.lines rawCsvData
 
 -- mapEmailAddress maps over each member and appends `@mail.uc.edu` to their email address if it exists
-expandEmailAddress :: [Member] -> [Member]
-expandEmailAddress members = Prelude.map 
-                             (\member -> member { emailAddress=Just ((Data.Maybe.fromMaybe "" (sixPlusTwo member)) ++ "@mail.uc.edu") })
-                             members
+expandEmailAddress :: [Member] -> Maybe [Member]
+expandEmailAddress members = do
+    let membersWithEmails = Prelude.map
+                  (\member -> member { emailAddress=Just ((Data.Maybe.fromMaybe "" (sixPlusTwo member)) ++ "@mail.uc.edu") })
+                  members
+    return membersWithEmails
 
--- filterMembers filter a list
--- will need to use filterM to filter through the list of Members,
--- and return only the members that are class of 2018
-filterMembers :: [Member] -> Int -> [Member]
-filterMembers members year = Prelude.filter (\member -> (graduationYear member) == (Just year)) members
+-- filterMembers filters a list and returns only the members that are class of 'year'
+filteredMembers :: [Member] -> Int -> Maybe [Member]
+filteredMembers members year = do
+    let filtered = Prelude.filter (\member -> (graduationYear member) == (Just year)) members
+    return filtered
 
 -- linesToMembers converts a list of strings to a list of members
-linesToMembers :: [String] -> [Member]
-linesToMembers [] = []
-linesToMembers lines = Prelude.map (\line -> (lineToMember line)) lines
+linesToMembers :: [String] -> Maybe [Member]
+linesToMembers lines = do
+    let members = Prelude.map (\line -> (lineToMember line)) lines
+    return members
 
 -- lineToMember converts a single line to a single member
 lineToMember :: String -> Member
@@ -80,7 +75,7 @@ lineToMember line = Member {
         name = (Just nm),
         graduationYear = (Just (read gy :: Int)),
         sixPlusTwo = (Just st),
-        emailAddress = (Just "")
+        emailAddress = Nothing
     }
     where (ts:nm:gy:spt) = Data.List.Split.splitOn "," line
           st = Prelude.head spt
