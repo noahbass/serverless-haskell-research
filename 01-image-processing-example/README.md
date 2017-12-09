@@ -9,3 +9,7 @@ This function could be triggered whenever a new object is uploaded to a specific
 ## Getting started with this example
 
 For this example, we use an image named `test-image.jpg` on a S3 bucket named `serverless-haskell-test-bucket`. Be sure the AWS credentials you're using have permissions to read and write objects to your bucket.
+
+https://github.com/brendanhay/amazonka
+
+cabal packages: amazonka, amazonka-s3
