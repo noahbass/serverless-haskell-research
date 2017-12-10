@@ -1,59 +1,74 @@
+{-# LANGUAGE OverloadedStrings #-}
 -- Image Proccessing Example
 -- A Use Case:
 --     This example uses Haskell the AWS S3 api to take an image from an S3 bucket, transform it
---     into many new images of various sizes (thumbnail, mobile, --     tablet, etc.), gives the
---     images unique names, then upload the new images to the same S3 bucket.
+--     into a new images of some size (thumbnail, mobile, tablet, etc.), give the new
+--     image unique name, then upload the new image to the same S3 bucket.
 --
 -- How we'll do it:
 --     With the name of the image, name of the S3 bucket, and the AWS api, we can retrieve the given image on S3.
---     Then, using image libraries, we can create new images of smaller sizes.
---     Finally, using the AWS api, we can upload the new images back to S3 in parallel
+--     Then, using image libraries, we can create a new image of smaller size.
+--     Finally, using the AWS api, we can upload the new image to S3
 -- 
 -- This example demonstrates:
 --     - Interacting with a third-party service (the AWS api in this example)
 --     - Image manipulation
 --     - Monads
 
--- import Data.ByteString.Internal.ByteString
-import           Control.Lens
-import           Control.Monad
-import           Control.Monad.IO.Class
--- import           Control.Monad.Trans.AWS
--- import Network.AWS -- amazonka
+import Data.Text
 import Data.ByteString.Char8
--- import Network.AWS.Data
--- import           Control.Monad.Trans.AWS
--- import Network.AWS.S3 -- amazonka-s3
--- import Network.AWS.S3.GetObject as S3GetObject
--- import Network.AWS.S3.PutObject as S3PutObject
--- import Network.AWS.S3.CreateMultipartUpload
+import Network.AWS -- amazonka
+import Network.AWS.Data
+import Network.AWS.S3
+import Network.AWS.S3.Types
 import qualified Graphics.Image as I
 import Graphics.Image.Processing
 
--- bufferToImageRepresentation gets the (ith, jth) pixel of an image in a buffer
--- bufferToImageRepresentation :: IO ()
--- bufferToImageRepresentation i j = putStrLn "hello world"
+-- TODO: update this example to to use a buffer (like the Node.js example), rather than read/write
 
-createImage :: IO ()
-createImage = putStrLn "TODO"
+main :: IO ()
+main = do
+    let dummyBucket = "serverless-haskell-test-bucket"
+    let accessKey = ""
+    let secretKey = ""
+    getImage "test-image.jpg" dummyBucket accessKey secretKey
+    -- scaleImage
+    -- putImage "test-image-540.jpg" dummyBucket accessKey secretKey
+    Prelude.putStrLn "Success!"
 
--- scaleImage takes an image from disk, transforms, and saves the image back to disk
--- TODO: design this to take a buffer
+-- scaleImage resizes an image to 360px height and 540px width
 scaleImage :: IO ()
 scaleImage = do
     img <- I.readImageRGB I.VU "test-image.jpg"
     I.writeImage "test-image-540.jpg" $ Graphics.Image.Processing.resize Bilinear Edge (360, 540) img
 
-main :: IO ()
-main = do
-    let dummyImage = "test-image.jpg"
-    let dummyBucket = "serverless-haskell-test-bucket"
-    Prelude.putStrLn "Connecting to the aws api"
+-- getImage gets an image from S3
+getImage :: String -> String -> String -> String -> IO ()
+getImage imageName bucketName accessKey secretKey = do
+    let packedAccessKey = Data.ByteString.Char8.pack accessKey
+    let packedSecretKey = Data.ByteString.Char8.pack secretKey
+    env <- newEnv $ FromKeys (AccessKey packedAccessKey) (SecretKey packedSecretKey)
+    runResourceT $ runAWS env $ within Ohio $ do
+        let s3BucketName = Network.AWS.S3.Types.BucketName (Data.Text.pack bucketName)
+        let s3ImageName = Network.AWS.S3.Types.ObjectKey (Data.Text.pack imageName) -- (the filename to upload as)
+        response <- send (Network.AWS.S3.getObject s3BucketName s3ImageName) -- get the file
+        let destinationFilePath = "test-image.jpg"
+        -- response `sinkBody` CB.sinkFile destinationFilePath -- save the file
+        return ()
+    return ()
 
 
--- resize transforms an image to a new size given the image buffer and the new size for the image
--- resize :: Image -> Int -> String
--- resize imageBuffer newSize = "foobar"
+-- putImage uploads and image to S3
+putImage :: String -> String -> String -> String -> IO PutObjectResponse
+putImage imageName bucketName accessKey secretKey = do
+    let packedAccessKey = Data.ByteString.Char8.pack accessKey
+    let packedSecretKey = Data.ByteString.Char8.pack secretKey
+    env <- newEnv $ FromKeys (AccessKey packedAccessKey) (SecretKey packedSecretKey)
+    requestBody <- chunkedFile defaultChunkSize imageName
+    let s3BucketName = Network.AWS.S3.Types.BucketName (Data.Text.pack bucketName)
+    let s3ImageName = Network.AWS.S3.Types.ObjectKey (Data.Text.pack imageName) -- (the filename to upload as)
+    runResourceT $ runAWS env $ within Ohio $ send (Network.AWS.S3.putObject s3BucketName s3ImageName requestBody)
+
 
 -- printBuckets :: IO ()
 -- printBuckets = do
@@ -83,10 +98,3 @@ main = do
 --         view gorsBody rs `sinkBody` CB.sinkFile f
 --         say $ "Successfully Download: "
 --             <> toText b <> " - " <> toText k <> " to " <> toText f
-
--- retrieveObject :: Region -> BucketName -> String
--- retrieveObject r b = "Foobar"
-
-
--- say :: MonadIO m => Text -> m ()
--- say = liftIO . Text.putStrLn
